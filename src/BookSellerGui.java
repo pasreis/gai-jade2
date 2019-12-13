@@ -9,7 +9,7 @@ import javax.swing.*;
 class BookSellerGui extends JFrame {	
 	private BookSellerAgent myAgent;
 	
-	private JTextField titleField, priceField;
+	private JTextField titleField, priceField, shippingPriceField;
 	
 	BookSellerGui(BookSellerAgent a) {
 		super(a.getLocalName());
@@ -21,9 +21,15 @@ class BookSellerGui extends JFrame {
 		p.add(new JLabel("Title:"));
 		titleField = new JTextField(15);
 		p.add(titleField);
+
 		p.add(new JLabel("Price:"));
 		priceField = new JTextField(15);
 		p.add(priceField);
+
+		p.add(new JLabel("Shipping Price:"));
+		shippingPriceField = new JTextField(15);
+		p.add(shippingPriceField);
+
 		getContentPane().add(p, BorderLayout.CENTER);
 		
 		JButton addButton = new JButton("Add");
@@ -31,8 +37,11 @@ class BookSellerGui extends JFrame {
 			public void actionPerformed(ActionEvent ev) {
 				try {
 					String title = titleField.getText().trim();
-					String price = priceField.getText().trim();
-					myAgent.updateCatalogue(title, Integer.parseInt(price));
+					int price = Integer.valueOf(priceField.getText().trim());
+					int shippingPrice = Integer.valueOf(shippingPriceField.getText().trim());
+
+					myAgent.updateCatalogue(title, price, shippingPrice);
+
 					titleField.setText("");
 					priceField.setText("");
 				}

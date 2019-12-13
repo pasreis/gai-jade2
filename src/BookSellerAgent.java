@@ -9,6 +9,8 @@ import jade.domain.FIPAException;
 import jade.domain.FIPAAgentManagement.DFAgentDescription;
 import jade.domain.FIPAAgentManagement.ServiceDescription;
 
+import java.io.IOException;
+import java.io.Serializable;
 import java.util.*;
 
 public class BookSellerAgent extends Agent {
@@ -52,11 +54,12 @@ public class BookSellerAgent extends Agent {
   }
 
   //invoked from GUI, when a new book is added to the catalogue
-  public void updateCatalogue(final String title, final int price) {
+  public void updateCatalogue(final String title, final int price, final int shippingPrice) {
     addBehaviour(new OneShotBehaviour() {
       public void action() {
-		catalogue.put(title, new Integer(price));
-		System.out.println(getAID().getLocalName() + ": " + title + " put into the catalogue. Price = " + price);
+      	Product product = new Product(title, price, shippingPrice);
+		catalogue.put(product.getName(), product);
+		System.out.println(getAID().getLocalName() + ": " + title + " put into the catalogue. Price = " + price + "zl. Shipping price: " + shippingPrice + "zl.");
       }
     } );
   }
@@ -69,12 +72,16 @@ public class BookSellerAgent extends Agent {
 	    if (msg != null) {
 	      String title = msg.getContent();
 	      ACLMessage reply = msg.createReply();
-	      Integer price = (Integer) catalogue.get(title);
-	      if (price != null) {
+	      Product product = (Product) catalogue.get(title);
+	      if (product != null) {
 	        //title found in the catalogue, respond with its price as a proposal
 	        reply.setPerformative(ACLMessage.PROPOSE);
-	        reply.setContent(String.valueOf(price.intValue()));
-	      }
+		  	try {
+			  reply.setContentObject(product);
+		  	} catch (IOException e) {
+			  e.printStackTrace();
+		  	}
+		  }
 	      else {
 	        //title not found in the catalogue
 	        reply.setPerformative(ACLMessage.REFUSE);
@@ -97,8 +104,8 @@ public class BookSellerAgent extends Agent {
 	    if (msg != null) {
 	      String title = msg.getContent();
 	      ACLMessage reply = msg.createReply();
-	      Integer price = (Integer) catalogue.remove(title);
-	      if (price != null) {
+	      Product product = (Product) catalogue.remove(title);
+	      if (product != null) {
 	        reply.setPerformative(ACLMessage.INFORM);
 	        System.out.println(getAID().getLocalName() + ": " + title + " sold to " + msg.getSender().getLocalName());
 	      }

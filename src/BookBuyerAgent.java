@@ -9,6 +9,7 @@ import jade.domain.DFService;
 import jade.domain.FIPAException;
 import jade.domain.FIPAAgentManagement.DFAgentDescription;
 import jade.domain.FIPAAgentManagement.ServiceDescription;
+import jade.lang.acl.UnreadableException;
 
 public class BookBuyerAgent extends Agent {
   private BookBuyerGui myGui;
@@ -109,12 +110,18 @@ public class BookBuyerAgent extends Agent {
 	      if (reply != null) {
 	        if (reply.getPerformative() == ACLMessage.PROPOSE) {
 	          //proposal received
-	          int price = Integer.parseInt(reply.getContent());
-	          if (bestSeller == null || price < bestPrice) {
-	            //the best proposal as for now
-	            bestPrice = price;
-	            bestSeller = reply.getSender();
-	          }
+	          //int price = Integer.parseInt(reply.getContent());
+				try {
+					Product product = (Product) reply.getContentObject();
+					int totalPrice = product.getCost() + product.getShippingCost();
+					if (bestSeller == null || totalPrice < bestPrice) {
+						//the best proposal as for now
+						bestPrice = totalPrice;
+						bestSeller = reply.getSender();
+					}
+				} catch (UnreadableException e) {
+					e.printStackTrace();
+				}
 	        }
 	        repliesCnt++;
 	        if (repliesCnt >= sellerAgents.length) {
