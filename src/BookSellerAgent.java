@@ -16,6 +16,7 @@ import java.util.*;
 public class BookSellerAgent extends Agent {
   private Hashtable catalogue;
   private BookSellerGui myGui;
+  private boolean waitingForConfirmation = false;
 
   protected void setup() {
     catalogue = new Hashtable();
@@ -39,6 +40,8 @@ public class BookSellerAgent extends Agent {
     addBehaviour(new OfferRequestsServer());
 
     addBehaviour(new PurchaseOrdersServer());
+
+    addBehaviour(new PurchaseOrderRejection());
   }
 
   protected void takeDown() {
@@ -76,6 +79,7 @@ public class BookSellerAgent extends Agent {
 	      if (product != null) {
 	        //title found in the catalogue, respond with its price as a proposal
 	        reply.setPerformative(ACLMessage.PROPOSE);
+	        waitingForConfirmation = true;
 		  	try {
 			  reply.setContentObject(product);
 		  	} catch (IOException e) {
@@ -108,18 +112,34 @@ public class BookSellerAgent extends Agent {
 	      if (product != null) {
 	        reply.setPerformative(ACLMessage.INFORM);
 	        System.out.println(getAID().getLocalName() + ": " + title + " sold to " + msg.getSender().getLocalName());
-	      }
-	      else {
+	      } else {
 	        //title not found in the catalogue, sold to another agent in the meantime (after proposal submission)
 	        reply.setPerformative(ACLMessage.FAILURE);
 	        reply.setContent("not-available");
 	      }
 	      myAgent.send(reply);
+	      waitingForConfirmation = false;
 	    }
 	    else {
 		  block();
 		}
 	  }
+	}
+
+	private class PurchaseOrderRejection extends CyclicBehaviour {
+  		@Override
+		public void action() {
+  			// Puchase has been rejected
+			MessageTemplate mt = MessageTemplate.MatchPerformative(ACLMessage.REJECT_PROPOSAL);
+			ACLMessage msg = myAgent.receive(mt);
+
+			if (msg != null) {
+				System.out.println(getAID().getLocalName() + ": Proposal has been rejected!");
+				waitingForConfirmation = false;
+			} else {
+				block();
+			}
+		}
 	}
 
 }

@@ -12,12 +12,17 @@ import jade.domain.FIPAAgentManagement.ServiceDescription;
 import jade.lang.acl.UnreadableException;
 
 public class BookBuyerAgent extends Agent {
-  private BookBuyerGui myGui;
-  private String targetBookTitle;
-  
-  //list of found sellers
-  private AID[] sellerAgents;
-  
+  	private BookBuyerGui myGui;
+	private String targetBookTitle;
+	private int budget;
+
+	public void setBudget(int budget) {
+		if (budget >= 0) this.budget = budget;
+	}
+
+	//list of found sellers
+	private AID[] sellerAgents;
+
 	protected void setup() {
 	  targetBookTitle = "";
 	  System.out.println("Hello! " + getAID().getLocalName() + " is ready for the purchase order.");
@@ -80,14 +85,14 @@ public class BookBuyerAgent extends Agent {
 		myGui.dispose();
 		System.out.println("Buyer agent " + getAID().getLocalName() + " terminated.");
 	}
-  
+
 	private class RequestPerformer extends Behaviour {
 	  private AID bestSeller;
 	  private int bestPrice;
 	  private int repliesCnt = 0;
 	  private MessageTemplate mt;
 	  private int step = 0;
-	
+
 	  public void action() {
 	    switch (step) {
 	    case 0:
@@ -95,7 +100,7 @@ public class BookBuyerAgent extends Agent {
 	      ACLMessage cfp = new ACLMessage(ACLMessage.CFP);
 	      for (int i = 0; i < sellerAgents.length; ++i) {
 	        cfp.addReceiver(sellerAgents[i]);
-	      } 
+	      }
 	      cfp.setContent(targetBookTitle);
 	      cfp.setConversationId("book-trade");
 	      cfp.setReplyWith("cfp"+System.currentTimeMillis()); //unique value
@@ -114,7 +119,7 @@ public class BookBuyerAgent extends Agent {
 				try {
 					Product product = (Product) reply.getContentObject();
 					int totalPrice = product.getCost() + product.getShippingCost();
-					if (bestSeller == null || totalPrice < bestPrice) {
+					if ((bestSeller == null || totalPrice < bestPrice) && totalPrice <= budget) {
 						//the best proposal as for now
 						bestPrice = totalPrice;
 						bestSeller = reply.getSender();
@@ -126,7 +131,7 @@ public class BookBuyerAgent extends Agent {
 	        repliesCnt++;
 	        if (repliesCnt >= sellerAgents.length) {
 	          //all proposals have been received
-	          step = 2; 
+	          step = 2;
 	        }
 	      }
 	      else {
@@ -143,18 +148,32 @@ public class BookBuyerAgent extends Agent {
 	      myAgent.send(order);
 	      mt = MessageTemplate.and(MessageTemplate.MatchConversationId("book-trade"),
 	                               MessageTemplate.MatchInReplyTo(order.getReplyWith()));
+
+	      for (AID agent: sellerAgents) {
+			  if (agent != bestSeller) {
+			  	ACLMessage doNotOrder = new ACLMessage(ACLMessage.REJECT_PROPOSAL);
+			  	doNotOrder.addReceiver(agent);
+			  	doNotOrder.setContent("No, Thanks!");
+			  	myAgent.send(doNotOrder);
+			  }
+		  }
+
 	      step = 3;
 	      break;
-	    case 3:      
+	    case 3:
 	      //seller confirms the transaction
 	      reply = myAgent.receive(mt);
 	      if (reply != null) {
 	        if (reply.getPerformative() == ACLMessage.INFORM) {
-	          //purchase succeeded
-	          System.out.println(getAID().getLocalName() + ": " + targetBookTitle + " purchased for " + bestPrice + " from " + reply.getSender().getLocalName());
-		  System.out.println(getAID().getLocalName() + ": waiting for the next purchase order.");
-		  targetBookTitle = "";
-	          //myAgent.doDelete();
+	          	//purchase succeeded
+	          	System.out.println(getAID().getLocalName() + ": " + targetBookTitle + " purchased for " + bestPrice + " from " + reply.getSender().getLocalName());
+
+	          	budget -= bestPrice;
+	          	System.out.println("Actual budget: " +  budget);
+
+		  		System.out.println(getAID().getLocalName() + ": waiting for the next purchase order.");
+		  		targetBookTitle = "";
+	          	//myAgent.doDelete();
 	        }
 	        else {
 	          System.out.println(getAID().getLocalName() + ": purchase has failed. " + targetBookTitle + " was sold in the meantime.");
@@ -165,14 +184,14 @@ public class BookBuyerAgent extends Agent {
 	        block();
 	      }
 	      break;
-	    }        
+	    }
 	  }
-	
+
 	  public boolean done() {
 	  	if (step == 2 && bestSeller == null) {
-	  		System.out.println(getAID().getLocalName() + ": " + targetBookTitle + " is not on sale.");
+	  		System.out.println(getAID().getLocalName() + ": " + targetBookTitle + " is not on sale for less then " + budget);
 	  	}
-	    //process terminates here if purchase has failed (title not on sale) or book was successfully bought 
+	    //process terminates here if purchase has failed (title not on sale) or book was successfully bought
 	    return ((step == 2 && bestSeller == null) || step == 4);
 	  }
 	}

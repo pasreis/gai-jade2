@@ -10,7 +10,8 @@ class BookBuyerGui extends JFrame {
 	private BookBuyerAgent myAgent;
 	
 	private JTextField titleField;
-	
+	private JTextField budgetField;
+
 	BookBuyerGui(BookBuyerAgent a) {
 		super(a.getLocalName());
 		
@@ -18,9 +19,15 @@ class BookBuyerGui extends JFrame {
 		
 		JPanel p = new JPanel();
 		p.setLayout(new GridLayout(2, 2));
+
 		p.add(new JLabel("Title:"));
 		titleField = new JTextField(15);
 		p.add(titleField);
+
+		p.add(new JLabel("Budget:"));
+		budgetField = new JTextField(15);
+		p.add(budgetField);
+
 		getContentPane().add(p, BorderLayout.CENTER);
 		
 		JButton addButton = new JButton("Search");
@@ -28,7 +35,11 @@ class BookBuyerGui extends JFrame {
 			public void actionPerformed(ActionEvent ev) {
 				try {
 					String title = titleField.getText().trim();
+					int budget = Integer.valueOf(budgetField.getText().trim());
+
 					myAgent.lookForTitle(title);
+					myAgent.setBudget(budget);
+
 					titleField.setText("");
 				}
 				catch (Exception e) {
