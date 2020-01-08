@@ -12,7 +12,7 @@ import jade.domain.FIPAAgentManagement.ServiceDescription;
 import jade.lang.acl.UnreadableException;
 
 public class BookBuyerAgent extends Agent {
-  	private BookBuyerGui myGui;
+  private BookBuyerGui myGui;
 	private String targetBookTitle;
 	private int budget;
 
@@ -81,7 +81,7 @@ public class BookBuyerAgent extends Agent {
 		});
 	}
 
-    	protected void takeDown() {
+  protected void takeDown() {
 		myGui.dispose();
 		System.out.println("Buyer agent " + getAID().getLocalName() + " terminated.");
 	}
@@ -116,17 +116,19 @@ public class BookBuyerAgent extends Agent {
 	        if (reply.getPerformative() == ACLMessage.PROPOSE) {
 	          //proposal received
 	          //int price = Integer.parseInt(reply.getContent());
-				try {
-					Product product = (Product) reply.getContentObject();
-					int totalPrice = product.getCost() + product.getShippingCost();
-					if ((bestSeller == null || totalPrice < bestPrice) && totalPrice <= budget) {
-						//the best proposal as for now
-						bestPrice = totalPrice;
-						bestSeller = reply.getSender();
-					}
-				} catch (UnreadableException e) {
-					e.printStackTrace();
-				}
+						try {
+							Product product = (Product) reply.getContentObject();
+							int totalPrice = product.getCost() + product.getShippingCost();
+							if ((bestSeller == null || totalPrice < bestPrice)) {
+								//the best proposal as for now
+								if (totalPrice <= budget) {
+									bestPrice = totalPrice;
+									bestSeller = reply.getSender();
+								}
+							} 
+						} catch (UnreadableException e) {
+							e.printStackTrace();
+						}
 	        }
 	        repliesCnt++;
 	        if (repliesCnt >= sellerAgents.length) {
@@ -140,25 +142,43 @@ public class BookBuyerAgent extends Agent {
 	      break;
 	    case 2:
 	      //best proposal consumption - purchase
-	      ACLMessage order = new ACLMessage(ACLMessage.ACCEPT_PROPOSAL);
-          order.addReceiver(bestSeller);
-	      order.setContent(targetBookTitle);
-	      order.setConversationId("book-trade");
-	      order.setReplyWith("order"+System.currentTimeMillis());
-	      myAgent.send(order);
-	      mt = MessageTemplate.and(MessageTemplate.MatchConversationId("book-trade"),
-	                               MessageTemplate.MatchInReplyTo(order.getReplyWith()));
+				if (bestSeller == null) {
+					System.out.println(getAID().getLocalName() + ": " + targetBookTitle + " is not on sale for less then " + budget);
 
-	      for (AID agent: sellerAgents) {
-			  if (agent != bestSeller) {
-			  	ACLMessage doNotOrder = new ACLMessage(ACLMessage.REJECT_PROPOSAL);
-			  	doNotOrder.addReceiver(agent);
-			  	doNotOrder.setContent("No, Thanks!");
-			  	myAgent.send(doNotOrder);
-			  }
-		  }
+					for (AID agent: sellerAgents) {
+						if (agent != bestSeller) {
+							ACLMessage doNotOrder = new ACLMessage(ACLMessage.REJECT_PROPOSAL);
+							doNotOrder.addReceiver(agent);
+							doNotOrder.setContent("No, Thanks!");
+							myAgent.send(doNotOrder);
+						}
+		  		}
 
-	      step = 3;
+					step = 4;
+					targetBookTitle = "";
+
+				} else {
+					ACLMessage order = new ACLMessage(ACLMessage.ACCEPT_PROPOSAL);
+					order.addReceiver(bestSeller);
+					order.setContent(targetBookTitle);
+					order.setConversationId("book-trade");
+					order.setReplyWith("order"+System.currentTimeMillis());
+					myAgent.send(order);
+					mt = MessageTemplate.and(MessageTemplate.MatchConversationId("book-trade"),
+																	MessageTemplate.MatchInReplyTo(order.getReplyWith()));
+
+					for (AID agent: sellerAgents) {
+						if (agent != bestSeller) {
+							ACLMessage doNotOrder = new ACLMessage(ACLMessage.REJECT_PROPOSAL);
+							doNotOrder.addReceiver(agent);
+							doNotOrder.setContent("No, Thanks!");
+							myAgent.send(doNotOrder);
+						}
+					}
+
+	      	step = 3;
+				}
+
 	      break;
 	    case 3:
 	      //seller confirms the transaction
@@ -188,11 +208,8 @@ public class BookBuyerAgent extends Agent {
 	  }
 
 	  public boolean done() {
-	  	if (step == 2 && bestSeller == null) {
-	  		System.out.println(getAID().getLocalName() + ": " + targetBookTitle + " is not on sale for less then " + budget);
-	  	}
 	    //process terminates here if purchase has failed (title not on sale) or book was successfully bought
-	    return ((step == 2 && bestSeller == null) || step == 4);
+	    return (step == 4);
 	  }
 	}
 
