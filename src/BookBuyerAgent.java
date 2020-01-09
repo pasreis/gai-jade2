@@ -14,7 +14,9 @@ import jade.lang.acl.UnreadableException;
 public class BookBuyerAgent extends Agent {
   private BookBuyerGui myGui;
 	private String targetBookTitle;
-	private int budget;
+  private int budget;
+  private static int TIMEOUT = 10000;
+  private long begin, end;
 
 	public void setBudget(int budget) {
 		if (budget >= 0) this.budget = budget;
@@ -96,7 +98,8 @@ public class BookBuyerAgent extends Agent {
 	  public void action() {
 	    switch (step) {
 	    case 0:
-	      //call for proposal (CFP) to found sellers
+        //call for proposal (CFP) to found sellers
+        begin = System.currentTimeMillis();
 	      ACLMessage cfp = new ACLMessage(ACLMessage.CFP);
 	      for (int i = 0; i < sellerAgents.length; ++i) {
 	        cfp.addReceiver(sellerAgents[i]);
@@ -110,35 +113,41 @@ public class BookBuyerAgent extends Agent {
 	      step = 1;
 	      break;
 	    case 1:
-	      //collect proposals
-	      ACLMessage reply = myAgent.receive(mt);
-	      if (reply != null) {
-	        if (reply.getPerformative() == ACLMessage.PROPOSE) {
-	          //proposal received
-	          //int price = Integer.parseInt(reply.getContent());
-						try {
-							Product product = (Product) reply.getContentObject();
-							int totalPrice = product.getCost() + product.getShippingCost();
-							if ((bestSeller == null || totalPrice < bestPrice)) {
-								//the best proposal as for now
-								if (totalPrice <= budget) {
-									bestPrice = totalPrice;
-									bestSeller = reply.getSender();
-								}
-							} 
-						} catch (UnreadableException e) {
-							e.printStackTrace();
-						}
-	        }
-	        repliesCnt++;
-	        if (repliesCnt >= sellerAgents.length) {
-	          //all proposals have been received
-	          step = 2;
-	        }
-	      }
-	      else {
-	        block();
-	      }
+        //collect proposals
+        end = System.currentTimeMillis();
+        long timeElapsed = end - begin;
+        ACLMessage reply = myAgent.receive(mt);
+        if (timeElapsed > TIMEOUT) {
+          step = 2;
+        } else {
+          if (reply != null) {
+            if (reply.getPerformative() == ACLMessage.PROPOSE) {
+              //proposal received
+              //int price = Integer.parseInt(reply.getContent());
+              try {
+                Product product = (Product) reply.getContentObject();
+                int totalPrice = product.getCost() + product.getShippingCost();
+                if ((bestSeller == null || totalPrice < bestPrice)) {
+                  //the best proposal as for now
+                  if (totalPrice <= budget) {
+                    bestPrice = totalPrice;
+                    bestSeller = reply.getSender();
+                  }
+                } 
+              } catch (UnreadableException e) {
+                e.printStackTrace();
+              }
+            }
+            repliesCnt++;
+            if (repliesCnt >= sellerAgents.length) {
+              //all proposals have been received
+              step = 2;
+            }
+          }
+          else {
+            block(TIMEOUT);
+          }
+        }
 	      break;
 	    case 2:
 	      //best proposal consumption - purchase
