@@ -149,7 +149,7 @@ public class BookBuyerAgent extends Agent {
 						if (agent != bestSeller) {
 							ACLMessage doNotOrder = new ACLMessage(ACLMessage.REJECT_PROPOSAL);
 							doNotOrder.addReceiver(agent);
-							doNotOrder.setContent("No, Thanks!");
+							doNotOrder.setContent(targetBookTitle);
 							myAgent.send(doNotOrder);
 						}
 		  		}

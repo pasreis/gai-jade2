@@ -13,13 +13,19 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.util.*;
 
+import javax.sound.sampled.Port;
+
+import com.oracle.jrockit.jfr.Producer;
+
 public class BookSellerAgent extends Agent {
   private Hashtable catalogue;
+  private Hashtable pending;
   private BookSellerGui myGui;
   private boolean waitingForConfirmation = false;
 
   protected void setup() {
     catalogue = new Hashtable();
+    pending = new Hashtable();
     myGui = new BookSellerGui(this);
     myGui.display();
 
@@ -70,22 +76,22 @@ public class BookSellerAgent extends Agent {
 	private class OfferRequestsServer extends CyclicBehaviour {
 	  public void action() {
 	    //proposals only template
-		MessageTemplate mt = MessageTemplate.MatchPerformative(ACLMessage.CFP);
-		ACLMessage msg = myAgent.receive(mt);
+      MessageTemplate mt = MessageTemplate.MatchPerformative(ACLMessage.CFP);
+      ACLMessage msg = myAgent.receive(mt);
 	    if (msg != null) {
 	      String title = msg.getContent();
 	      ACLMessage reply = msg.createReply();
-	      Product product = (Product) catalogue.get(title);
+	      Product product = (Product) catalogue.remove(title);
 	      if (product != null) {
 	        //title found in the catalogue, respond with its price as a proposal
 	        reply.setPerformative(ACLMessage.PROPOSE);
-	        waitingForConfirmation = true;
-		  	try {
-			  reply.setContentObject(product);
-		  	} catch (IOException e) {
-			  e.printStackTrace();
-		  	}
-		  }
+	        pending.put(product.getName(), product);
+          try {
+            reply.setContentObject(product);
+          } catch (IOException e) {
+            e.printStackTrace();
+          }
+		    }
 	      else {
 	        //title not found in the catalogue
 	        reply.setPerformative(ACLMessage.REFUSE);
@@ -108,10 +114,10 @@ public class BookSellerAgent extends Agent {
 	    if (msg != null) {
 	      String title = msg.getContent();
 	      ACLMessage reply = msg.createReply();
-	      Product product = (Product) catalogue.remove(title);
+	      Product product = (Product) pending.remove(title);
 	      if (product != null) {
 	        reply.setPerformative(ACLMessage.INFORM);
-	        System.out.println(getAID().getLocalName() + ": " + title + " sold to " + msg.getSender().getLocalName());
+          System.out.println(getAID().getLocalName() + ": " + title + " sold to " + msg.getSender().getLocalName());
 	      } else {
 	        //title not found in the catalogue, sold to another agent in the meantime (after proposal submission)
 	        reply.setPerformative(ACLMessage.FAILURE);
@@ -127,15 +133,16 @@ public class BookSellerAgent extends Agent {
 	}
 
 	private class PurchaseOrderRejection extends CyclicBehaviour {
-  		@Override
+    @Override
 		public void action() {
   			// Puchase has been rejected
 			MessageTemplate mt = MessageTemplate.MatchPerformative(ACLMessage.REJECT_PROPOSAL);
 			ACLMessage msg = myAgent.receive(mt);
-
+      
 			if (msg != null) {
-				System.out.println(getAID().getLocalName() + ": Proposal has been rejected!");
-				waitingForConfirmation = false;
+        Product product = (Product) pending.remove(msg.getContent());
+        System.out.println(getAID().getLocalName() + ": Proposal has been rejected!");
+        if (product != null) catalogue.put(product.getName(), product);
 			} else {
 				block();
 			}
